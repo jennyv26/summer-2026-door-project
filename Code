@@ -1,22 +1,63 @@
 #include <LiquidCrystal.h>
-#include <Wire.h>
+#include <MFRC522.h>
+#include <SPI.h>
 
+//setting up RFID pins
+#define RST_PIN 9
+#define SS_PIN 10
+//int MOSI = 11;
+//int MISO = 12;
+//int SCK = 13;
+MFRC522 rfid(SS_PIN, RST_PIN);
 
-int RS = 12; 
-int E = 11;
+//Setting up lcd pins
+int RS = 7; 
+int E = 6;
 int D4 = 5;
 int D5 = 4;
 int D6 = 3;
 int D7 = 2;
 LiquidCrystal lcd(RS,E,D4,D5,D6,D7);
 
+
 void setup() {
-  // put your setup code here, to run once:
-  lcd.begin(16, 2);
-  lcd.print("Hello World :)");
+  
+  //serial monitor
+  Serial.begin(9600);
+
+  //lcd screen
+  lcd.begin(16,2);
+
+  //card reader intializing
+  SPI.begin();
+  rfid.PCD_Init();
+
+  //initially tells user to scan card
+  Serial.print("\n");
+  Serial.print("Scan Card\n");
+  lcd.print("Scan Card");
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
 
+void loop() {
+
+ //rfid checks for a card and if nothing is there it prints that out 
+  if (!rfid.PICC_IsNewCardPresent()){
+    return;
+  }
+  //if no card present it does nothing 
+  if (!rfid.PICC_ReadCardSerial()){
+    return;
+  }
+
+  //clears the screen from the "Scan card"
+  lcd.clear();
+
+  //After card detection it prints out the card was detected for 2 seconds and then tells user to scan card 
+  Serial.print("Card Detected!!!\n");
+  lcd.print("Card Detected!!!");
+  delay(2000);
+  lcd.clear();
+  rfid.PICC_HaltA();
+  lcd.print("Scan Card");
 }
