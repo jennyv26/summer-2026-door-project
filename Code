@@ -1,4 +1,4 @@
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 #include <MFRC522.h>
 #include <SPI.h>
 
@@ -10,14 +10,10 @@
 //int SCK = 13;
 MFRC522 rfid(SS_PIN, RST_PIN);
 
-//Setting up lcd pins
-int RS = 7; 
-int E = 6;
-int D4 = 5;
-int D5 = 4;
-int D6 = 3;
-int D7 = 2;
-LiquidCrystal lcd(RS,E,D4,D5,D6,D7);
+//setting up 4 pin lcd
+//SDA = A4
+//SCL = A5
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 
 void setup() {
@@ -26,7 +22,9 @@ void setup() {
   Serial.begin(9600);
 
   //lcd screen
-  lcd.begin(16,2);
+  lcd.init();
+  lcd.backlight();
+
 
   //card reader intializing
   SPI.begin();
