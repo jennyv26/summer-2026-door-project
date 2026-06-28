@@ -1,4 +1,5 @@
 #include <LiquidCrystal_I2C.h>
+#include <EEPROM.h>
 #include <MFRC522.h>
 #include <SPI.h>
 
@@ -15,6 +16,13 @@ MFRC522 rfid(SS_PIN, RST_PIN);
 //SCL = A5
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+//Master card UID
+byte Master[] = {0x47, 0x26, 0x89, 0x33};
+
+//Global Variables
+int nextAddress = 0;
+
+
 
 void setup() {
   
@@ -25,7 +33,6 @@ void setup() {
   lcd.init();
   lcd.backlight();
 
-
   //card reader intializing
   SPI.begin();
   rfid.PCD_Init();
@@ -34,10 +41,19 @@ void setup() {
   Serial.print("\n");
   Serial.print("Scan Card\n");
   lcd.print("Scan Card");
+
+  //Use to clear EEPROM data when card reader isnt working properly
+  //for (int i = 0; i < 100; i++){
+    //EEPROM.write(i, 0);
+  //}
 }
 
 
 void loop() {
+
+  //variables
+  int ismaster;
+  int isValid;
 
  //rfid checks for a card and if nothing is there it prints that out 
   if (!rfid.PICC_IsNewCardPresent()){
@@ -48,14 +64,177 @@ void loop() {
     return;
   }
 
-  //clears the screen from the "Scan card"
-  lcd.clear();
+  //calls functions
 
-  //After card detection it prints out the card was detected for 2 seconds and then tells user to scan card 
+  ismaster = Check_Master(); //returns 1 or 0 to see if card scanned is master to go into admin mode
+  if (ismaster == 1){
+
+    //admin mode
+    Serial.print("Master Card Detected\n");
+    UID(); //prints out uid in serial monitor
+    intructions();
+    
+    //waits for new card to be scanned
+    rfid.PICC_HaltA(); //line 73 and 74 are to reset the rfid scanner so a new card can be scanned
+    while (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()){ /*nothing*/ }
+
+    ismaster = Check_Master(); //checks if the card scanned is the master uid and returns 1 or 0 
+    if (ismaster == 0){
+      isValid = validCard();
+      if (isValid == 0){ 
+        saveCard(); //if master card is not detcted and card isnt already saved then then it will save the card
+        return;
+      }
+      else if (isValid == 1){
+        deleteCard();
+        lcd.clear();
+        lcd.print("Card Removed");
+        delay(1000);
+        lcd.clear();
+        lcd.print("Scan Card");
+        return;
+      }
+    }
+  }
+
+
+
+  //if card scanned is not master it will check for validity
+  isValid = validCard(); //gets the true or false
+  //if its valid access is granted
+  //This is where you call the function to control servo after access has been granted
+  if(isValid == 1){ 
+    lcd.clear();
+    lcd.print("Access Granted");
+    delay(2000);
+    lcd.clear();
+    lcd.print("Scan Card");
+    //------------------------------------------------------------------------------------------------------------------------
+    //----------------------JENNY THIS IS WHERE YOU ADD CODE AFTER ACCESS WITH ID CARD HAS BEEN GRANTED-----------------------
+    //------------------------------------------------------------------------------------------------------------------------
+    return;
+  }
+  else{
+    //if not valid it simply prints access denied
+    lcd.clear();
+    UID();
+    lcd.print("Access Denied");
+    Serial.print("This is not the master card\n");
+    Serial.print("Try again in 1 second");
+    delay(1000);
+    lcd.clear();
+    lcd.print("Scan Card");
+    return;
+  }
+
+}
+
+void Card_Detected(){
+  //After card detection it prints out the card was detected for 2 seconds and then tells user to scan card
+  lcd.clear();
   Serial.print("Card Detected!!!\n");
-  lcd.print("Card Detected!!!");
+  lcd.print("Access Granted!!!");
   delay(2000);
   lcd.clear();
   rfid.PICC_HaltA();
   lcd.print("Scan Card");
+}
+
+void UID(){
+  //Uses a for loop to print out the each byte of the rfid number in Hexadecimal  
+  int i;
+  for (i = 0; i < rfid.uid.size; i++){
+    //putting Hex makes the ID print in Hexadecimal instead of numbers
+    Serial.print(rfid.uid.uidByte[i], HEX); 
+  }
+  Serial.print("\n");
+}
+
+int Check_Master(){
+  //compares the Master card UID to the card scanned
+  int i;
+  int j = 0;
+  for (i = 0; i < rfid.uid.size; i++){
+    if (rfid.uid.uidByte[i] == Master[i]){
+      j++;
+    }
+    else{
+      j--;
+    }
+  }  
+  if (j == 4){
+      return 1;
+    }
+    else{
+      return 0;
+    }
+}
+
+void intructions(){
+  //prints instructions
+  lcd.clear();
+  lcd.print("Scan to");
+  lcd.setCursor(0,1);
+  lcd.print("Add/Remove card");
+}
+
+void saveCard(){
+  //This function will save the UID of the card that is being added
+  int i;
+  for (i = 0; i < rfid.uid.size; i++){
+    EEPROM.write(nextAddress + i, rfid.uid.uidByte[i]);
+  }
+  nextAddress = nextAddress + 4;
+  Serial.print("New Card Saved");
+  lcd.clear();
+  lcd.print("Card Saved!!");
+  delay(1500);
+  lcd.clear();
+  lcd.print("Scan Card");
+}
+
+int validCard(){
+  //checks if card scanned matches any of the registered cards
+  int i, j, match;
+  //nested loop to run through every card and every 4 bytes of every card
+  for (j = 0; j <= nextAddress; j = j+4){
+    match = 0;
+    for (i = 0; i < 4; i++){
+      if (rfid.uid.uidByte[i] == EEPROM.read(i + j)){
+        match++;
+      }
+    }
+    //if match reaches 4 then we know 4 bytes in a row were able to be identified with a registered card
+    if (match == 4){
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void deleteCard(){
+
+  //variables
+  int i, j, match;
+  int address[4];
+
+  //nested loop 
+  for(j = 0; j < nextAddress; j+=4){
+    match = 0;
+    for (i = 0; i < 4; i++){
+      if (rfid.uid.uidByte[i] == EEPROM.read(i + j)){
+        match++;
+        address[i] = i+j;
+      }
+    }
+    if (match == 4){
+      for (i = 0; i < nextAddress; i=i+4){
+        EEPROM.write(address[0] + i, EEPROM.read(address[0] + i + 4));
+        EEPROM.write(address[1] + i, EEPROM.read(address[1] + i + 4));
+        EEPROM.write(address[2] + i, EEPROM.read(address[2] + i + 4));
+        EEPROM.write(address[3] + i, EEPROM.read(address[3] + i + 4));
+      }
+      nextAddress = nextAddress - 4;
+    }
+  }
 }
