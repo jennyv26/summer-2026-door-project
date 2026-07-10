@@ -111,6 +111,87 @@ void loop() {
     lcd.print("Scan Card");
     //------------------------------------------------------------------------------------------------------------------------
     //----------------------JENNY THIS IS WHERE YOU ADD CODE AFTER ACCESS WITH ID CARD HAS BEEN GRANTED-----------------------
+#include <LiquidCrystal.h>
+#include <Wire.h>
+#include <Servo.h>
+
+int RS = 12; 
+int E = 11;
+int D4 = 5;
+int D5 = 4;
+int D6 = 3;
+int D7 = 2;
+LiquidCrystal lcd(RS,E,D4,D5,D6,D7);
+
+Servo myservo;  // create servo object to control a servo
+// twelve servo objects can be created on most boards
+
+bool rfid = false; // if rfid is valid 
+int pos = 0;    // variable to store the servo position
+
+const int servoPin = 6;  // yellow wire on servo goes to pin 6, red = 5V, Brown = GND
+const int trigPin = 9;   
+const int echoPin = 10;
+const float door_threshold = 10.0; // distance below 8 cm means door is closed
+
+long duration;
+int distance;
+
+bool isDoorOpen() {
+  // Clear the trigPin by setting it LOW for 2 microseconds
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  // Set the trigPin HIGH for 10 microseconds to send out the ultrasonic pulse
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Read the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH, 30000); // 30ms timeout avoids hanging if no echo
+
+  // Calculate distance: speed of sound ~0.034 cm/us, divide by 2 for round trip
+  distance = duration * 0.034 / 2;
+
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  return distance > door_threshold;
+}
+
+void setup() {
+  // put your setup code here, to run once:
+  lcd.begin(16, 2);
+  lcd.print("Hello World :)");
+  myservo.attach(servoPin);  // attaches the servo to its pin
+  
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT);  // Sets the echoPin as an Input
+  Serial.begin(9600);       // Starts the serial communication
+}
+
+void loop() {  // right now, loop will run once 
+
+if (rfid == false) { 
+  myservo.write(180); // Command it to swing to 180 instantly
+  delay(300);         // Give the physical motor 300ms to physically get there
+  
+  myservo.write(0);   // Command it to swing back to 0 instantly
+  delay(300);         // Give it time to return
+  
+  rfid = true;        // Prevent it from looping again
+}
+if (isDoorOpen()) {
+  Serial.println("Door is Open");
+  } 
+else {
+  Serial.println("Door is Close");
+  }
+
+  delay(600);
+}
+
     //------------------------------------------------------------------------------------------------------------------------
     return;
   }
