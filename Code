@@ -112,7 +112,6 @@ void loop() {
     //------------------------------------------------------------------------------------------------------------------------
     //----------------------JENNY THIS IS WHERE YOU ADD CODE AFTER ACCESS WITH ID CARD HAS BEEN GRANTED-----------------------
 #include <LiquidCrystal.h>
-#include <Wire.h>
 #include <Servo.h>
 
 int RS = 12; 
